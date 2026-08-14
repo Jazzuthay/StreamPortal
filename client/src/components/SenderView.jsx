@@ -86,8 +86,6 @@ export default function SenderView({ roomId, onLeave }) {
   const [previewRotation, setPreviewRotation] = useState(0);
   const [previewFlipped,  setPreviewFlipped]  = useState(false);
   const [overlayMode,     setOverlayMode]     = useState('logo');
-  const [isFullscreen,    setIsFullscreen]    = useState(false);
-  const [needsFullscreen, setNeedsFullscreen] = useState(true);
   const localVideoRef  = useRef(null);
   const containerRef   = useRef(null);
   const selectedCamera = useRef(null);
@@ -144,17 +142,6 @@ export default function SenderView({ roomId, onLeave }) {
 
   const { isRecording, timer, startRecording, stopRecording } = useRecording(rawStream, roomId);
 
-  const enterFullscreen = useCallback(async () => {
-    try { await containerRef.current?.requestFullscreen(); } catch { /* denied */ }
-  }, []);
-
-  useEffect(() => {
-    const onChange = () => setIsFullscreen(!!document.fullscreenElement);
-    document.addEventListener('fullscreenchange', onChange);
-    return () => document.removeEventListener('fullscreenchange', onChange);
-  }, []);
-
-  useEffect(() => { if (isFullscreen) setNeedsFullscreen(false); }, [isFullscreen]);
 
   async function handleCameraChange(deviceId) {
     selectedCamera.current = deviceId;
@@ -182,10 +169,10 @@ export default function SenderView({ roomId, onLeave }) {
   );
 
   return (
-    <div ref={containerRef} className="min-h-screen bg-[#f8f5ff] flex flex-col items-center justify-center p-4">
-      {/* Portrait video container */}
-      <div className="relative" style={{ width: '100%', maxWidth: 'min(540px, calc(100vw - 2rem))', aspectRatio: '9/16' }}>
-        <div className="w-full h-full bg-[#141414] border border-[#e8e0f5] rounded-xl overflow-hidden relative">
+    <div ref={containerRef} className="fixed inset-0 bg-[#141414] overflow-hidden">
+      {/* Full-window video container */}
+      <div className="relative w-full h-full">
+        <div className="w-full h-full bg-[#141414] overflow-hidden relative">
           <video ref={localVideoRef} autoPlay muted playsInline style={previewStyle} />
           {!rawStream && (
             <div className="absolute inset-0 flex items-center justify-center text-gray-500 text-sm">
@@ -219,15 +206,15 @@ export default function SenderView({ roomId, onLeave }) {
         >
           <GearIcon />
         </button>
-      </div>
 
-      {/* Status */}
-      <div className="mt-3 flex items-center gap-4">
-        <ConnectionBadge state={connectionState} />
-        <span className="flex items-center gap-1.5 text-sm text-gray-500">
-          <span className="w-2 h-2 rounded-full bg-[#7c3aed]" />
-          {viewerCount} viewer{viewerCount !== 1 ? 's' : ''}
-        </span>
+        {/* Status overlay — bottom */}
+        <div className="absolute bottom-3 left-3 z-10 flex items-center gap-3">
+          <ConnectionBadge state={connectionState} />
+          <span className="flex items-center gap-1.5 text-sm text-gray-300">
+            <span className="w-2 h-2 rounded-full bg-[#7c3aed]" />
+            {viewerCount} viewer{viewerCount !== 1 ? 's' : ''}
+          </span>
+        </div>
       </div>
 
       {/* Settings — right-side overlay */}
@@ -345,20 +332,6 @@ export default function SenderView({ roomId, onLeave }) {
             )}
           </div>
         </>
-      )}
-
-      {/* Tap-to-fullscreen prompt */}
-      {needsFullscreen && !isFullscreen && (
-        <div
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center cursor-pointer"
-          style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
-          onClick={enterFullscreen}
-        >
-          <svg width="48" height="48" fill="white" viewBox="0 0 24 24" opacity="0.9">
-            <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
-          </svg>
-          <p className="text-white font-semibold mt-3 text-base">Tap to enter fullscreen</p>
-        </div>
       )}
 
       <DebugOverlay role="sender" connectionState={connectionState} iceGatheringState={iceGatheringState} />

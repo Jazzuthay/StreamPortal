@@ -154,16 +154,12 @@ export default function ReceiverView({ roomId, onLeave }) {
 
   useEffect(() => () => clearTimeout(hideTimerRef.current), []);
 
-  const [needsFullscreen, setNeedsFullscreen] = useState(true);
-
   const enterFullscreen = useCallback(async () => {
     try { await containerRef.current?.requestFullscreen(); } catch { /* denied */ }
   }, []);
   const exitFullscreen = useCallback(async () => {
     if (document.fullscreenElement) await document.exitFullscreen();
   }, []);
-
-  useEffect(() => { if (isFullscreen) setNeedsFullscreen(false); }, [isFullscreen]);
 
   const videoStyle = {
     objectFit: fitMode,
@@ -182,19 +178,15 @@ export default function ReceiverView({ roomId, onLeave }) {
     </div>
   );
 
-  const controlsVisible = !isFullscreen || showControls;
+  const controlsVisible = showControls;
 
   return (
-    <div className="min-h-screen bg-[#f8f5ff] flex flex-col items-center justify-center p-6">
+    <div className="fixed inset-0 bg-black overflow-hidden">
       <div
         ref={containerRef}
-        onMouseMove={() => { if (isFullscreen) revealControls(); }}
-        onClick={() => { if (isFullscreen && !showSettings) revealControls(); }}
-        className="relative bg-black overflow-hidden"
-        style={isFullscreen
-          ? { width: '100%', height: '100%' }
-          : { width: '100%', maxWidth: '320px', aspectRatio: '9/16', borderRadius: '12px', border: '1px solid #e8e0f5' }
-        }
+        onMouseMove={revealControls}
+        onClick={() => { if (!showSettings) revealControls(); }}
+        className="relative w-full h-full bg-black overflow-hidden"
       >
         {/* Always rendered so Agora play() has a DOM target */}
         <video ref={remoteVideoRef} autoPlay playsInline style={{ ...videoStyle, display: hasRemoteVideo ? 'block' : 'none' }} />
@@ -261,19 +253,6 @@ export default function ReceiverView({ roomId, onLeave }) {
           <ConnectionBadge state={connectionState} />
         </div>
 
-        {/* Tap-to-fullscreen prompt */}
-        {needsFullscreen && !isFullscreen && (
-          <div
-            className="absolute inset-0 z-50 flex flex-col items-center justify-center cursor-pointer"
-            style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
-            onClick={enterFullscreen}
-          >
-            <svg width="48" height="48" fill="white" viewBox="0 0 24 24" opacity="0.9">
-              <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
-            </svg>
-            <p className="text-white font-semibold mt-3 text-base">Tap to enter fullscreen</p>
-          </div>
-        )}
       </div>
 
       {/* Settings — right-side overlay */}
