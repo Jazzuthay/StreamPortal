@@ -86,7 +86,9 @@ export default function SenderView({ roomId, onLeave }) {
   const [previewRotation, setPreviewRotation] = useState(0);
   const [previewFlipped,  setPreviewFlipped]  = useState(false);
   const [overlayMode,     setOverlayMode]     = useState('logo');
+  const [isFullscreen,    setIsFullscreen]    = useState(false);
   const localVideoRef  = useRef(null);
+  const containerRef   = useRef(null);
   const selectedCamera = useRef(null);
   const selectedMic    = useRef(null);
 
@@ -141,6 +143,22 @@ export default function SenderView({ roomId, onLeave }) {
 
   const { isRecording, timer, startRecording, stopRecording } = useRecording(rawStream, roomId);
 
+  const enterFullscreen = useCallback(async () => {
+    try { await containerRef.current?.requestFullscreen(); } catch { /* denied */ }
+  }, []);
+
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  }, []);
+
+  // Auto-enter fullscreen on mount
+  useEffect(() => {
+    const id = setTimeout(() => { enterFullscreen(); }, 300);
+    return () => clearTimeout(id);
+  }, [enterFullscreen]);
+
   async function handleCameraChange(deviceId) {
     selectedCamera.current = deviceId;
     await startCamera(deviceId, selectedMic.current);
@@ -167,7 +185,7 @@ export default function SenderView({ roomId, onLeave }) {
   );
 
   return (
-    <div className="min-h-screen bg-[#f8f5ff] flex flex-col items-center justify-center p-4">
+    <div ref={containerRef} className="min-h-screen bg-[#f8f5ff] flex flex-col items-center justify-center p-4">
       {/* Portrait video container */}
       <div className="relative" style={{ width: '100%', maxWidth: 'min(540px, calc(100vw - 2rem))', aspectRatio: '9/16' }}>
         <div className="w-full h-full bg-[#141414] border border-[#e8e0f5] rounded-xl overflow-hidden relative">

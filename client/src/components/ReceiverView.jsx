@@ -161,6 +161,12 @@ export default function ReceiverView({ roomId, onLeave }) {
     if (document.fullscreenElement) await document.exitFullscreen();
   }, []);
 
+  // Auto-enter fullscreen on mount
+  useEffect(() => {
+    const id = setTimeout(() => { enterFullscreen(); }, 300);
+    return () => clearTimeout(id);
+  }, [enterFullscreen]);
+
   const videoStyle = {
     objectFit: fitMode,
     transform: `rotate(${displayRotation}deg) scaleX(${flipped ? -1 : 1})`,
