@@ -154,6 +154,8 @@ export default function ReceiverView({ roomId, onLeave }) {
 
   useEffect(() => () => clearTimeout(hideTimerRef.current), []);
 
+  const [needsFullscreen, setNeedsFullscreen] = useState(true);
+
   const enterFullscreen = useCallback(async () => {
     try { await containerRef.current?.requestFullscreen(); } catch { /* denied */ }
   }, []);
@@ -161,11 +163,7 @@ export default function ReceiverView({ roomId, onLeave }) {
     if (document.fullscreenElement) await document.exitFullscreen();
   }, []);
 
-  // Auto-enter fullscreen on mount
-  useEffect(() => {
-    const id = setTimeout(() => { enterFullscreen(); }, 300);
-    return () => clearTimeout(id);
-  }, [enterFullscreen]);
+  useEffect(() => { if (isFullscreen) setNeedsFullscreen(false); }, [isFullscreen]);
 
   const videoStyle = {
     objectFit: fitMode,
@@ -262,6 +260,20 @@ export default function ReceiverView({ roomId, onLeave }) {
         >
           <ConnectionBadge state={connectionState} />
         </div>
+
+        {/* Tap-to-fullscreen prompt */}
+        {needsFullscreen && !isFullscreen && (
+          <div
+            className="absolute inset-0 z-50 flex flex-col items-center justify-center cursor-pointer"
+            style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+            onClick={enterFullscreen}
+          >
+            <svg width="48" height="48" fill="white" viewBox="0 0 24 24" opacity="0.9">
+              <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+            </svg>
+            <p className="text-white font-semibold mt-3 text-base">Tap to enter fullscreen</p>
+          </div>
+        )}
       </div>
 
       {/* Settings — right-side overlay */}

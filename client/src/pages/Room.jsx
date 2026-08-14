@@ -260,7 +260,7 @@ export default function Room() {
           link={roleLinks.sender}
           selected={selectedRole === 'sender'}
           onSelect={() => { setSelectedRole(selectedRole === 'sender' ? null : 'sender'); setJoinError(''); }}
-          onOpen={() => handleJoinBroadcast('sender')}
+          onOpen={() => { document.documentElement.requestFullscreen().catch(() => {}); handleJoinBroadcast('sender'); }}
         />
         <RoleCard
           icon={<IconViewer />}
@@ -268,7 +268,7 @@ export default function Room() {
           link={roleLinks.receiver}
           selected={selectedRole === 'receiver'}
           onSelect={() => { setSelectedRole(selectedRole === 'receiver' ? null : 'receiver'); setJoinError(''); }}
-          onOpen={() => handleJoinBroadcast('receiver')}
+          onOpen={() => { document.documentElement.requestFullscreen().catch(() => {}); handleJoinBroadcast('receiver'); }}
         />
         <RoleCard
           icon={<IconFaceToFace />}
