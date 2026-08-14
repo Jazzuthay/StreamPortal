@@ -1,4 +1,4 @@
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { apiFetch } from '../utils/api.js';
 import socket from '../utils/socket.js';
@@ -53,32 +53,103 @@ function IconFaceToFace() {
   );
 }
 
-function RoundButton({ onClick, icon, label }) {
+function CopyIcon() {
   return (
-    <button onClick={onClick} className="flex flex-col items-center gap-4 group">
-      <div className="w-[140px] h-[140px] sm:w-[160px] sm:h-[160px] lg:w-[200px] lg:h-[200px] rounded-full bg-[#8B2BE2] flex items-center justify-center shadow-xl shadow-[#8B2BE2]/25 group-hover:bg-[#7B1BD2] group-active:scale-95 transition-all duration-150 [&_svg]:w-[52px] [&_svg]:h-[52px] sm:[&_svg]:w-[60px] sm:[&_svg]:h-[60px] lg:[&_svg]:w-[72px] lg:[&_svg]:h-[72px]">
-        {icon}
-      </div>
-      <span className="text-gray-900 font-semibold text-sm tracking-widest uppercase">{label}</span>
-    </button>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+    </svg>
+  );
+}
+function ExternalIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+    </svg>
+  );
+}
+
+function RoleCard({ icon, label, link, onOpen, selected, onSelect }) {
+  const [copied, setCopied] = useState(false);
+
+  function copyLink() {
+    navigator.clipboard.writeText(link);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-3">
+      <button onClick={onSelect} className="flex flex-col items-center gap-4 group">
+        <div className={`w-[140px] h-[140px] sm:w-[160px] sm:h-[160px] lg:w-[200px] lg:h-[200px] rounded-full flex items-center justify-center shadow-xl transition-all duration-150 group-active:scale-95 [&_svg]:w-[52px] [&_svg]:h-[52px] sm:[&_svg]:w-[60px] sm:[&_svg]:h-[60px] lg:[&_svg]:w-[72px] lg:[&_svg]:h-[72px] ${
+          selected ? 'bg-[#6d1fc0] shadow-[#8B2BE2]/40 ring-4 ring-[#8B2BE2]/30' : 'bg-[#8B2BE2] shadow-[#8B2BE2]/25 group-hover:bg-[#7B1BD2]'
+        }`}>
+          {icon}
+        </div>
+        <span className="text-gray-900 font-semibold text-sm tracking-widest uppercase">{label}</span>
+      </button>
+
+      {selected && (
+        <div className="w-full bg-white border border-[#e8e0f5] rounded-2xl p-3 shadow-lg shadow-[#8B2BE2]/10 space-y-2">
+          <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Direct link</p>
+          <div className="bg-[#f8f5ff] rounded-xl px-3 py-2">
+            <p className="text-[11px] text-gray-600 font-mono break-all leading-relaxed">{link}</p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={onOpen}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[#8B2BE2] hover:bg-[#7B1BD2] text-white text-xs font-semibold transition-colors"
+            >
+              <ExternalIcon /> Open here
+            </button>
+            <button
+              onClick={copyLink}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold border transition-colors ${
+                copied ? 'bg-green-50 border-green-300 text-green-700' : 'bg-[#f0ebff] border-[#e8e0f5] text-gray-600 hover:border-[#8B2BE2] hover:text-[#8B2BE2]'
+              }`}
+            >
+              <CopyIcon /> {copied ? 'Copied!' : 'Copy link'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
 export default function Room() {
   const { roomId } = useParams();
+  const [searchParams] = useSearchParams();
   const [room,          setRoom]          = useState(null);
   const [notFound,      setNotFound]      = useState(false);
   const [inMeeting,     setInMeeting]     = useState(false);
   const [broadcastRole, setBroadcastRole] = useState(null);
+  const [selectedRole,  setSelectedRole]  = useState(null);
   const [joinError,          setJoinError]          = useState('');
   const [showSpectatorModal, setShowSpectatorModal] = useState(false);
   const [spectatorPassword,  setSpectatorPassword]  = useState('');
   const [spectatorError,     setSpectatorError]     = useState('');
 
+  const origin = window.location.origin;
+  const roleLinks = {
+    sender:   `${origin}/room/${roomId}?role=sender`,
+    receiver: `${origin}/room/${roomId}?role=receiver`,
+    meeting:  `${origin}/room/${roomId}?role=meeting`,
+    admin:    `${origin}/room/${roomId}?role=admin`,
+  };
+
   useEffect(() => {
     apiFetch(`/api/rooms/${roomId}`)
       .then((res) => { if (!res.ok) { setNotFound(true); return null; } return res.json(); })
-      .then((data) => { if (data) setRoom(data); })
+      .then((data) => {
+        if (!data) return;
+        setRoom(data);
+        // Auto-join if ?role= param is present
+        const role = searchParams.get('role');
+        if (role === 'sender')   { socket.emit('join-room', { roomId, role: 'sender' });   setBroadcastRole('sender'); }
+        if (role === 'receiver') { socket.emit('join-room', { roomId, role: 'receiver' }); setBroadcastRole('receiver'); }
+        if (role === 'meeting')  { setInMeeting(true); }
+        if (role === 'admin')    { setShowSpectatorModal(true); }
+      })
       .catch(() => setNotFound(true));
 
     socket.on('role-taken', ({ role: takenRole }) => {
@@ -181,27 +252,39 @@ export default function Room() {
         </div>
       </div>
 
-      {/* Buttons — 2×2 grid */}
-      <div className="grid grid-cols-2 gap-10 sm:gap-12 lg:gap-16 w-full max-w-sm sm:max-w-md lg:max-w-xl">
-        <RoundButton
-          onClick={() => handleJoinBroadcast('sender')}
+      {/* Role cards — 2×2 grid */}
+      <div className="grid grid-cols-2 gap-6 sm:gap-10 lg:gap-14 w-full max-w-sm sm:max-w-lg lg:max-w-2xl">
+        <RoleCard
           icon={<IconStreamer />}
           label="Streamer"
+          link={roleLinks.sender}
+          selected={selectedRole === 'sender'}
+          onSelect={() => { setSelectedRole(selectedRole === 'sender' ? null : 'sender'); setJoinError(''); }}
+          onOpen={() => handleJoinBroadcast('sender')}
         />
-        <RoundButton
-          onClick={() => handleJoinBroadcast('receiver')}
+        <RoleCard
           icon={<IconViewer />}
           label="Viewer"
+          link={roleLinks.receiver}
+          selected={selectedRole === 'receiver'}
+          onSelect={() => { setSelectedRole(selectedRole === 'receiver' ? null : 'receiver'); setJoinError(''); }}
+          onOpen={() => handleJoinBroadcast('receiver')}
         />
-        <RoundButton
-          onClick={() => { setJoinError(''); setInMeeting(true); }}
+        <RoleCard
           icon={<IconFaceToFace />}
           label="Face to Face"
+          link={roleLinks.meeting}
+          selected={selectedRole === 'meeting'}
+          onSelect={() => { setSelectedRole(selectedRole === 'meeting' ? null : 'meeting'); setJoinError(''); }}
+          onOpen={() => { setJoinError(''); setInMeeting(true); }}
         />
-        <RoundButton
-          onClick={() => { setJoinError(''); setSpectatorError(''); setSpectatorPassword(''); setShowSpectatorModal(true); }}
+        <RoleCard
           icon={<IconSpectator />}
           label="Admin View"
+          link={roleLinks.admin}
+          selected={selectedRole === 'admin'}
+          onSelect={() => { setSelectedRole(selectedRole === 'admin' ? null : 'admin'); setJoinError(''); }}
+          onOpen={() => { setJoinError(''); setSpectatorError(''); setSpectatorPassword(''); setShowSpectatorModal(true); }}
         />
       </div>
 
