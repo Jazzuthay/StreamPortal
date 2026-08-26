@@ -2,7 +2,7 @@ const { randomUUID } = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
-const PERSIST_FILE = path.join(__dirname, 'rooms.json');
+const PERSIST_FILE = process.env.ROOMS_DATA_PATH || path.join(__dirname, 'rooms.json');
 
 // Load rooms persisted from previous run
 const rooms = new Map();
