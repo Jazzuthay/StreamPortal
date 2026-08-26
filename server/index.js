@@ -6,7 +6,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const authRouter = require('./auth');
 const verifyToken = require('./middleware/verifyToken');
-const { createRoom, getRooms, getRoom, deleteRoom, updateRoom } = require('./roomManager');
+const { connectDB, createRoom, getRooms, getRoom, deleteRoom, updateRoom } = require('./roomManager');
 
 let RtcTokenBuilder, RtcRole;
 try {
@@ -315,6 +315,8 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 4000;
-server.listen(PORT, () => {
-  console.log(`StreamPortal server running on port ${PORT}`);
+connectDB().then(() => {
+  server.listen(PORT, () => {
+    console.log(`StreamPortal server running on port ${PORT}`);
+  });
 });

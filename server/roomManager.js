@@ -1,32 +1,58 @@
 const { randomUUID } = require('crypto');
-const fs = require('fs');
-const path = require('path');
+const mongoose = require('mongoose');
 
-const PERSIST_FILE = process.env.ROOMS_DATA_PATH || path.join(__dirname, 'rooms.json');
-
-// Load rooms persisted from previous run
 const rooms = new Map();
-try {
-  const raw = fs.readFileSync(PERSIST_FILE, 'utf8');
-  const saved = JSON.parse(raw);
-  for (const room of saved) {
-    // Reset transient join state on restart but keep room config
-    room.senderJoined   = false;
-    room.receiverJoined = false;
-    room.senderConnectedAt = null;
-    rooms.set(room.id, room);
+let dbConnected = false;
+
+const roomSchema = new mongoose.Schema({
+  id:               { type: String, required: true, unique: true },
+  name:             { type: String, default: '' },
+  createdAt:        { type: String },
+  bytesUsed:        { type: Number, default: 0 },
+  bytesLimit:       { type: Number, default: 0 },
+  sessionSeconds:   { type: Number, default: 0 },
+  resolutionTier:   { type: String, default: null },
+  resolutionWidth:  { type: Number, default: 0 },
+  resolutionHeight: { type: Number, default: 0 },
+  overlayMode:      { type: String, default: 'logo' },
+}, { _id: false, versionKey: false });
+
+const RoomModel = mongoose.model('Room', roomSchema);
+
+async function connectDB() {
+  const uri = process.env.MONGODB_URI;
+  if (!uri) {
+    console.warn('[rooms] MONGODB_URI not set — rooms stored in memory only (will not survive restart)');
+    return;
   }
-  console.log(`[rooms] Loaded ${rooms.size} room(s) from disk`);
-} catch {
-  // File missing or unreadable — start fresh
+  try {
+    await mongoose.connect(uri);
+    dbConnected = true;
+    const docs = await RoomModel.find().lean();
+    for (const doc of docs) {
+      rooms.set(doc.id, {
+        ...doc,
+        senderJoined: false,
+        receiverJoined: false,
+        senderConnectedAt: null,
+      });
+    }
+    console.log(`[rooms] Connected to MongoDB, loaded ${rooms.size} room(s)`);
+  } catch (err) {
+    console.error('[rooms] MongoDB connection failed:', err.message);
+  }
 }
 
-function persist() {
-  try {
-    fs.writeFileSync(PERSIST_FILE, JSON.stringify(Array.from(rooms.values()), null, 2));
-  } catch (e) {
-    console.warn('[rooms] Could not persist rooms:', e.message);
-  }
+function dbSave(room) {
+  if (!dbConnected) return;
+  const { senderJoined, receiverJoined, senderConnectedAt, ...data } = room;
+  RoomModel.findOneAndUpdate({ id: data.id }, data, { upsert: true })
+    .catch((e) => console.warn('[rooms] DB write error:', e.message));
+}
+
+function dbDelete(id) {
+  if (!dbConnected) return;
+  RoomModel.deleteOne({ id }).catch((e) => console.warn('[rooms] DB delete error:', e.message));
 }
 
 function createRoom(name, bytesLimit = 0) {
@@ -47,7 +73,7 @@ function createRoom(name, bytesLimit = 0) {
     overlayMode: 'logo',
   };
   rooms.set(id, room);
-  persist();
+  dbSave(room);
   return room;
 }
 
@@ -61,7 +87,7 @@ function getRoom(id) {
 
 function deleteRoom(id) {
   const deleted = rooms.delete(id);
-  if (deleted) persist();
+  if (deleted) dbDelete(id);
   return deleted;
 }
 
@@ -69,12 +95,17 @@ function updateRoom(id, updates) {
   const room = rooms.get(id);
   if (!room) return null;
   Object.assign(room, updates);
-  // Only persist fields that matter long-term (skip high-frequency stats)
-  if (updates.name !== undefined || updates.bytesLimit !== undefined ||
-      updates.sessionSeconds !== undefined || updates.resolutionTier !== undefined) {
-    persist();
+  // Only write to DB for fields worth persisting (skip high-frequency in-session stats)
+  if (
+    updates.name !== undefined ||
+    updates.bytesLimit !== undefined ||
+    updates.sessionSeconds !== undefined ||
+    updates.resolutionTier !== undefined ||
+    updates.overlayMode !== undefined
+  ) {
+    dbSave(room);
   }
   return room;
 }
 
-module.exports = { createRoom, getRooms, getRoom, deleteRoom, updateRoom };
+module.exports = { connectDB, createRoom, getRooms, getRoom, deleteRoom, updateRoom };
